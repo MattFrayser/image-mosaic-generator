@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mosaic Generator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Mosaic Generator</h1>
+        </header>
+
+        <div class="main-content">
+            <div class="controls-panel">
+                <div class="control-group">
+                    <label for="target-image">Target Image</label>
+                    <button id="select-target-btn" class="file-btn">Select Image</button>
+                    <span id="target-path" class="file-path">No file selected</span>
+                    <img id="target-preview" class="target-preview hidden" alt="Target Image">
+                </div>
+
+                <div class="control-group">
+                    <label for="tile-directory">Tile Directory</label>
+                    <button id="select-tiles-btn" class="file-btn">Select Folder</button>
+                    <span id="tiles-path" class="file-path">No folder selected</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="tile-size">
+                        Tile Size: <span id="tile-size-value">32</span>px
+                    </label>
+                    <input type="range" id="tile-size" min="8" max="128" value="32" step="4">
+                    <span class="hint">Smaller = more tiles, finer detail. Larger = fewer tiles, blockier effect.</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="asset-size">
+                        Asset Size: <span id="asset-size-value">64</span>px
+                    </label>
+                    <input type="range" id="asset-size" min="32" max="256" value="64" step="8">
+                    <span class="hint">Higher = better quality tiles (slower). Try 64 or 128.</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="penalty-factor">
+                        Penalty Factor: <span id="penalty-factor-value">50</span>
+                    </label>
+                    <input type="range" id="penalty-factor" min="0" max="100" value="50" step="1">
+                    <span class="hint">0=pure color match, 50=balanced, 100=max diversity</span>
+                </div>
+
+                <div class="control-group">
+                    <label for="sigma-divisor">
+                        Sigma Divisor: <span id="sigma-divisor-value">4.0</span>
+                    </label>
+                    <input type="range" id="sigma-divisor" min="0" max="10" value="4" step="0.5">
+                    <span class="hint">0=uniform, higher=stronger center focus</span>
+                </div>
+
+                <button id="generate-btn" class="generate-btn" disabled>Generate Mosaic</button>
+                <div id="mosaic-info" class="mosaic-info hidden"></div>
+                <div id="status" class="status"></div>
+            </div>
+
+            <div class="preview-panel">
+                <div id="loading" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Generating mosaic...</p>
+                </div>
+                <img id="mosaic-preview" class="mosaic-image hidden" alt="Mosaic Preview">
+                <div id="placeholder" class="placeholder">
+                    Select images and adjust settings to generate a mosaic
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
