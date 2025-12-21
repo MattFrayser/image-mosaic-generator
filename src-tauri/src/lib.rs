@@ -3,7 +3,7 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tile {
     pub path: PathBuf,
     pub color: [f64; 3],

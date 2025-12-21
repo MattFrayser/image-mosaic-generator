@@ -29,8 +29,7 @@ See the [Tauri Prerequisites Guide](https://v2.tauri.app/start/prerequisites/) f
 ## Settings
 
 - **Tile Size** (8-128px): Controls the granularity of the mosaic
-- **Asset Size** (32-256px): Size to resize source tile images
-- **Penalty Factor** (0-500): Controls how much to penalize tile reuse
+- **Penalty Factor** (0-100): Controls tile reuse penalty (0=ignore reuse, 50=balanced, 100=max diversity)
 - **Sigma Divisor** (0-10): Gaussian weighting (0=uniform, higher=stronger center focus)
 
 ## Running the Application

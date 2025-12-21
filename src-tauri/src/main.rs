@@ -10,12 +10,12 @@ use tokio::sync::RwLock;
 #[derive(Clone, PartialEq, Debug)]
 struct CacheKey {
     tile_directory: String,
-    asset_size: u32,
+    tile_size: u32,
 }
 
 #[derive(Default)]
 struct AppState {
-    tiles: Arc<RwLock<Arc<Vec<Tile>>>>,
+    tiles: Arc<RwLock<Vec<Tile>>>,
     cache_params: Arc<RwLock<Option<CacheKey>>>,
 }
 
@@ -24,16 +24,18 @@ struct MosaicParams {
     target_image_path: String,
     tile_directory: String,
     tile_size: u32,
-    asset_size: u32,
     penalty_factor: f64,
     sigma_divisor: f64,
 }
 
 #[tauri::command]
-async fn generate_mosaic(params: MosaicParams, state: State<'_, AppState>) -> Result<String, String> {
+async fn generate_mosaic(
+    params: MosaicParams,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
     let cache_key = CacheKey {
         tile_directory: params.tile_directory.clone(),
-        asset_size: params.asset_size,
+        tile_size: params.tile_size,
     };
 
     // Check if cache is valid
@@ -46,12 +48,15 @@ async fn generate_mosaic(params: MosaicParams, state: State<'_, AppState>) -> Re
     };
 
     let tiles = if needs_reload {
-        println!("Loading tiles: {} @ {}px", cache_key.tile_directory, cache_key.asset_size);
+        println!(
+            "Loading tiles: {} @ {}px",
+            cache_key.tile_directory, cache_key.tile_size
+        );
 
         let new_tiles = tokio::task::spawn_blocking({
             let dir = cache_key.tile_directory.clone();
-            let size = cache_key.asset_size;
-            move || Arc::new(load_library(&dir, size))
+            let size = cache_key.tile_size;
+            move || load_library(&dir, size)
         })
         .await
         .map_err(|e| format!("Failed to load tiles: {}", e))?;
@@ -65,7 +70,7 @@ async fn generate_mosaic(params: MosaicParams, state: State<'_, AppState>) -> Re
         new_tiles
     } else {
         println!("Using cached tiles");
-        state.tiles.read().await.clone()
+        (*state.tiles.read().await).clone()
     };
 
     // Run heavy computation in blocking task
@@ -77,6 +82,9 @@ async fn generate_mosaic(params: MosaicParams, state: State<'_, AppState>) -> Re
         let (target_w, target_h) = target.dimensions();
         let mut canvas = ImageBuffer::new(target_w, target_h);
         let mut usage_counts = vec![0usize; tiles.len()];
+
+        // Calculate penalty multiplier based on tile library size
+        let tile_count = tiles.len() as f64;
 
         for y in (0..target_h).step_by(params.tile_size as usize) {
             for x in (0..target_w).step_by(params.tile_size as usize) {
@@ -95,9 +103,9 @@ async fn generate_mosaic(params: MosaicParams, state: State<'_, AppState>) -> Re
                     let b_diff = (tile.color[2] - target_color[2]).abs();
 
                     let color_dist = (r_diff * r_diff) + (g_diff * g_diff) + (b_diff * b_diff);
-                    let penalty = usage_counts[i] as f64 * params.penalty_factor;
-                    let total_dist = color_dist + penalty;
+                    let penalty = usage_counts[i] as f64 * params.penalty_factor * 50.0;
 
+                    let total_dist = color_dist + penalty;
                     if total_dist < min_dist {
                         min_dist = total_dist;
                         best_idx = i;
@@ -106,11 +114,22 @@ async fn generate_mosaic(params: MosaicParams, state: State<'_, AppState>) -> Re
 
                 usage_counts[best_idx] += 1;
 
-                let final_tile = tiles[best_idx]
-                    .image
-                    .resize_exact(width, height, FilterType::Nearest);
+                let needs_resize = width != params.tile_size || height != params.tile_size;
 
-                image::imageops::overlay(&mut canvas, &final_tile, x as i64, y as i64);
+                if needs_resize {
+                    let resized =
+                        tiles[best_idx]
+                            .image
+                            .resize_exact(width, height, FilterType::Nearest);
+                    image::imageops::overlay(&mut canvas, &resized, x as i64, y as i64);
+                } else {
+                    image::imageops::overlay(
+                        &mut canvas,
+                        &tiles[best_idx].image,
+                        x as i64,
+                        y as i64,
+                    );
+                }
             }
         }
 

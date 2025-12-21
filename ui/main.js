@@ -13,25 +13,45 @@ function toAssetUrl(path) {
     return convertFileSrc(path);
 }
 
+function clearStatus() {
+    const existingStatus = document.getElementById('status');
+    if (existingStatus) {
+        existingStatus.remove();
+    }
+}
+
+function showStatus(message, type) {
+    // Only create status for errors
+    if (type !== 'error') return;
+
+    clearStatus();
+
+    const statusEl = document.createElement('div');
+    statusEl.id = 'status';
+    statusEl.className = 'status error';
+    statusEl.textContent = message;
+
+    // Insert after mosaic-info
+    const mosaicInfo = document.getElementById('mosaic-info');
+    mosaicInfo.parentElement.appendChild(statusEl);
+}
+
 let targetImagePath = '';
 let tileDirectoryPath = '';
-let debounceTimer = null;
 
 const elements = {
     tileSizeSlider: document.getElementById('tile-size'),
     tileSizeValue: document.getElementById('tile-size-value'),
-    assetSizeSlider: document.getElementById('asset-size'),
-    assetSizeValue: document.getElementById('asset-size-value'),
     penaltyFactorSlider: document.getElementById('penalty-factor'),
     penaltyFactorValue: document.getElementById('penalty-factor-value'),
     sigmaDivisorSlider: document.getElementById('sigma-divisor'),
     sigmaDivisorValue: document.getElementById('sigma-divisor-value'),
     selectTargetBtn: document.getElementById('select-target-btn'),
     selectTilesBtn: document.getElementById('select-tiles-btn'),
-    targetPath: document.getElementById('target-path'),
+    targetContainer: document.getElementById('target-image-container'),
+    targetPreview: document.getElementById('target-preview'),
     tilesPath: document.getElementById('tiles-path'),
     generateBtn: document.getElementById('generate-btn'),
-    status: document.getElementById('status'),
     mosaicPreview: document.getElementById('mosaic-preview'),
     loading: document.getElementById('loading'),
     placeholder: document.getElementById('placeholder'),
@@ -48,10 +68,6 @@ elements.tileSizeSlider.addEventListener('input', (e) => {
     updateSliderValue(e.target, elements.tileSizeValue);
 });
 
-elements.assetSizeSlider.addEventListener('input', (e) => {
-    updateSliderValue(e.target, elements.assetSizeValue);
-});
-
 elements.penaltyFactorSlider.addEventListener('input', (e) => {
     updateSliderValue(e.target, elements.penaltyFactorValue, 0);
 });
@@ -60,7 +76,7 @@ elements.sigmaDivisorSlider.addEventListener('input', (e) => {
     updateSliderValue(e.target, elements.sigmaDivisorValue, 1);
 });
 
-elements.selectTargetBtn.addEventListener('click', async () => {
+async function selectTargetImage() {
     try {
         const selected = await open({
             multiple: false,
@@ -72,19 +88,21 @@ elements.selectTargetBtn.addEventListener('click', async () => {
 
         if (selected) {
             targetImagePath = selected;
-            elements.targetPath.textContent = selected.split('/').pop();
-
-            // Show original image preview
-            const targetPreview = document.getElementById('target-preview');
-            targetPreview.src = toAssetUrl(selected);
-            targetPreview.classList.remove('hidden');
-
+            elements.targetPreview.src = toAssetUrl(selected);
+            elements.targetContainer.classList.add('has-image');
             checkCanGenerate();
+            clearStatus();
         }
     } catch (error) {
         showStatus('Error selecting file: ' + error, 'error');
     }
-});
+}
+
+// Attach to button click
+elements.selectTargetBtn.addEventListener('click', selectTargetImage);
+
+// Attach to preview click (for changing image)
+elements.targetPreview.addEventListener('click', selectTargetImage);
 
 elements.selectTilesBtn.addEventListener('click', async () => {
     try {
@@ -97,6 +115,7 @@ elements.selectTilesBtn.addEventListener('click', async () => {
             tileDirectoryPath = selected;
             elements.tilesPath.textContent = selected.split('/').pop();
             checkCanGenerate();
+            clearStatus();
         }
     } catch (error) {
         showStatus('Error selecting folder: ' + error, 'error');
@@ -122,14 +141,12 @@ async function generateMosaic() {
     elements.loading.classList.remove('hidden');
     elements.mosaicPreview.classList.add('hidden');
     elements.placeholder.classList.add('hidden');
-    elements.status.textContent = '';
-    elements.status.className = 'status';
+    clearStatus();
 
     const params = {
         target_image_path: targetImagePath,
         tile_directory: tileDirectoryPath,
         tile_size: parseInt(elements.tileSizeSlider.value),
-        asset_size: parseInt(elements.assetSizeSlider.value),
         penalty_factor: parseFloat(elements.penaltyFactorSlider.value),
         sigma_divisor: parseFloat(elements.sigmaDivisorSlider.value)
     };
@@ -142,9 +159,9 @@ async function generateMosaic() {
         const assetUrl = toAssetUrl(filePath);
         console.log('Asset URL:', assetUrl);
 
-        // Force image reload
-        elements.mosaicPreview.src = '';
-        elements.mosaicPreview.src = assetUrl;
+        // Force image reload with cache busting
+        const cacheBustedUrl = `${assetUrl}?t=${Date.now()}`;
+        elements.mosaicPreview.src = cacheBustedUrl;
 
         elements.mosaicPreview.classList.remove('hidden');
         elements.placeholder.classList.add('hidden');
@@ -159,9 +176,9 @@ async function generateMosaic() {
             elements.mosaicInfo.textContent = `Mosaic: ${img.width}×${img.height}px | ${tilesWide}×${tilesHigh} tiles (${totalTiles} total)`;
             elements.mosaicInfo.classList.remove('hidden');
         };
-        img.src = assetUrl;
+        img.src = cacheBustedUrl;
 
-        showStatus('Mosaic generated successfully!', 'success');
+        clearStatus();
     } catch (error) {
         elements.placeholder.classList.remove('hidden');
         showStatus('Error: ' + error, 'error');

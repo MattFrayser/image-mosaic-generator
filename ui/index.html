@@ -8,17 +8,14 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Mosaic Generator</h1>
-        </header>
-
         <div class="main-content">
             <div class="controls-panel">
                 <div class="control-group">
                     <label for="target-image">Target Image</label>
-                    <button id="select-target-btn" class="file-btn">Select Image</button>
-                    <span id="target-path" class="file-path">No file selected</span>
-                    <img id="target-preview" class="target-preview hidden" alt="Target Image">
+                    <div id="target-image-container">
+                        <img id="target-preview" class="target-preview hidden" alt="Target Image">
+                        <button id="select-target-btn" class="file-btn">Select Image</button>
+                    </div>
                 </div>
 
                 <div class="control-group">
@@ -36,19 +33,11 @@
                 </div>
 
                 <div class="control-group">
-                    <label for="asset-size">
-                        Asset Size: <span id="asset-size-value">64</span>px
-                    </label>
-                    <input type="range" id="asset-size" min="32" max="256" value="64" step="8">
-                    <span class="hint">Higher = better quality tiles (slower). Try 64 or 128.</span>
-                </div>
-
-                <div class="control-group">
                     <label for="penalty-factor">
                         Penalty Factor: <span id="penalty-factor-value">50</span>
                     </label>
                     <input type="range" id="penalty-factor" min="0" max="100" value="50" step="1">
-                    <span class="hint">0=pure color match, 50=balanced, 100=max diversity</span>
+                    <span class="hint">Controls tile reuse penalty (0=ignore, 50=balanced, 100=max diversity)</span>
                 </div>
 
                 <div class="control-group">
@@ -60,8 +49,8 @@
                 </div>
 
                 <button id="generate-btn" class="generate-btn" disabled>Generate Mosaic</button>
+
                 <div id="mosaic-info" class="mosaic-info hidden"></div>
-                <div id="status" class="status"></div>
             </div>
 
             <div class="preview-panel">
