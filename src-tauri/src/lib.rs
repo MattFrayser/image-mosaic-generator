@@ -202,6 +202,36 @@ fn avg_rgb_with_mask(img: &DynamicImage, mask: &GaussianMask) -> [f64; 3] {
     [r / total, g / total, b / total]
 }
 
+#[inline]
+fn padded_dimensions(width: u32, height: u32, tile_size: u32) -> (u32, u32) {
+    let pad_w = ((width + tile_size - 1) / tile_size) * tile_size;
+    let pad_h = ((height + tile_size - 1) / tile_size) * tile_size;
+    (pad_w, pad_h)
+}
+
+fn pad_target_to_tile_grid(
+    target_img: &DynamicImage,
+    orig_w: u32,
+    orig_h: u32,
+    pad_w: u32,
+    pad_h: u32,
+) -> image::RgbaImage {
+    if pad_w == orig_w && pad_h == orig_h {
+        target_img.to_rgba8()
+    } else {
+        target_img
+            .resize_exact(pad_w, pad_h, FilterType::Lanczos3)
+            .to_rgba8()
+    }
+}
+
+fn build_tile_coordinates(width: u32, height: u32, tile_size: u32) -> Vec<(u32, u32)> {
+    (0..height)
+        .step_by(tile_size as usize)
+        .flat_map(|y| (0..width).step_by(tile_size as usize).map(move |x| (x, y)))
+        .collect()
+}
+
 /// Tile library with KD-tree acceleration for fast color matching.
 pub struct TileLibrary {
     tiles: Vec<Tile>,
@@ -283,30 +313,9 @@ impl TileLibrary {
         let target_img = load_image_with_orientation(target_path)?;
         let (orig_w, orig_h) = target_img.dimensions();
 
-        // Pad image to be a perfect multiple of tile_size
-        let pad_w = ((orig_w + self.tile_size - 1) / self.tile_size) * self.tile_size;
-        let pad_h = ((orig_h + self.tile_size - 1) / self.tile_size) * self.tile_size;
-
-        // Only resize if dimensions actually changed to preserve quality
-        let target = if pad_w == orig_w && pad_h == orig_h {
-            // No padding needed, use original image
-            target_img.to_rgba8()
-        } else {
-            // Resize only when necessary, using high-quality filter
-            target_img
-                .resize_exact(pad_w, pad_h, FilterType::Lanczos3)
-                .to_rgba8()
-        };
-
-        // Calculate tile coordinates
-        let coords: Vec<(u32, u32)> = (0..pad_h)
-            .step_by(self.tile_size as usize)
-            .flat_map(|y| {
-                (0..pad_w)
-                    .step_by(self.tile_size as usize)
-                    .map(move |x| (x, y))
-            })
-            .collect();
+        let (pad_w, pad_h) = padded_dimensions(orig_w, orig_h, self.tile_size);
+        let target = pad_target_to_tile_grid(&target_img, orig_w, orig_h, pad_w, pad_h);
+        let coords = build_tile_coordinates(pad_w, pad_h, self.tile_size);
 
         // Process tiles sequentially with usage tracking
         // Penalty must be applied sequentially to maintain deterministic results
@@ -490,5 +499,17 @@ mod tests {
             inf_sigma,
             Err(AppError::Config(message)) if message.contains("sigma_divisor")
         ));
+    }
+
+    #[test]
+    fn padded_dimensions_rounds_up_to_tile_multiple() {
+        assert_eq!(padded_dimensions(100, 65, 32), (128, 96));
+        assert_eq!(padded_dimensions(64, 96, 32), (64, 96));
+    }
+
+    #[test]
+    fn build_tile_coordinates_is_row_major() {
+        let coords = build_tile_coordinates(64, 64, 32);
+        assert_eq!(coords, vec![(0, 0), (32, 0), (0, 32), (32, 32)]);
     }
 }
