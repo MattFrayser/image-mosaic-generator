@@ -204,8 +204,8 @@ fn avg_rgb_with_mask(img: &DynamicImage, mask: &GaussianMask) -> [f64; 3] {
 
 #[inline]
 fn padded_dimensions(width: u32, height: u32, tile_size: u32) -> (u32, u32) {
-    let pad_w = ((width + tile_size - 1) / tile_size) * tile_size;
-    let pad_h = ((height + tile_size - 1) / tile_size) * tile_size;
+    let pad_w = width.div_ceil(tile_size) * tile_size;
+    let pad_h = height.div_ceil(tile_size) * tile_size;
     (pad_w, pad_h)
 }
 
@@ -376,8 +376,7 @@ impl TileLibrary {
     ) -> usize {
         // Adaptive k: query 10-100 nearest neighbors
         let k = (self.tiles.len() / KD_TREE_K_DIVISOR)
-            .max(KD_TREE_K_MIN)
-            .min(KD_TREE_K_MAX)
+            .clamp(KD_TREE_K_MIN, KD_TREE_K_MAX)
             .min(self.tiles.len())
             .max(1);
 

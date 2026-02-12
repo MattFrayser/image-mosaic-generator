@@ -36,16 +36,16 @@ async fn get_adaptive_settings(
 
     let (width, height) = target_img.dimensions();
     let min_dimension = width.min(height);
-    
+
     // Calculate adaptive tile size based on image dimensions
     // Target: ~50-200 tiles per dimension for good detail
     let adaptive_tile_size = {
         let tiles_per_dim = 100.0; // Target tiles per dimension
         let suggested = (min_dimension as f64 / tiles_per_dim).round() as u32;
         // Clamp to reasonable range
-        suggested.max(8).min(128)
+        suggested.clamp(8, 128)
     };
-    
+
     // Count tiles in directory
     use walkdir::WalkDir;
     let tile_count = WalkDir::new(&tile_directory)
@@ -61,7 +61,7 @@ async fn get_adaptive_settings(
             }
         })
         .count();
-    
+
     // Calculate adaptive penalty factor based on tile count
     // Fewer tiles = lower penalty (need to reuse), more tiles = higher penalty (can diversify)
     let adaptive_penalty = if tile_count == 0 {
@@ -76,7 +76,7 @@ async fn get_adaptive_settings(
         // Many tiles: high penalty (70-100)
         70.0 + ((tile_count.min(1000) - 200) as f64 / 800.0) * 30.0
     };
-    
+
     Ok(serde_json::json!({
         "tile_size": adaptive_tile_size,
         "penalty_factor": adaptive_penalty.round(),
@@ -92,7 +92,11 @@ async fn generate_mosaic(
     params: MosaicParams,
     state: State<'_, AppState>,
 ) -> Result<String, AppError> {
-    validate_mosaic_inputs(params.tile_size, params.penalty_factor, params.sigma_divisor)?;
+    validate_mosaic_inputs(
+        params.tile_size,
+        params.penalty_factor,
+        params.sigma_divisor,
+    )?;
 
     let mut library_guard = state.library.write().await;
 
@@ -130,7 +134,10 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![generate_mosaic, get_adaptive_settings])
+        .invoke_handler(tauri::generate_handler![
+            generate_mosaic,
+            get_adaptive_settings
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

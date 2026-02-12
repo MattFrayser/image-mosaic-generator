@@ -1,7 +1,8 @@
-import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { UIManager } from './ui.js';
 import { deriveGenerateUiFlags, transitionGenerateState } from './generate-state.mjs';
+import { generateApi } from './features/generate/generate-api.js';
 
 function init() {
     const ui = new UIManager();
@@ -90,9 +91,9 @@ function init() {
         if (!state.targetPath || !state.tileDir) return;
         
         try {
-            const adaptive = await invoke('get_adaptive_settings', {
-                target_image_path: state.targetPath,
-                tile_directory: state.tileDir
+            const adaptive = await generateApi.getAdaptiveSettings({
+                targetPath: state.targetPath,
+                tileDir: state.tileDir
             });
             
             // Update UI with adaptive suggestions
@@ -132,7 +133,7 @@ function init() {
         };
 
         try {
-            const output = await invoke('generate_mosaic', { params });
+            const output = await generateApi.generateMosaic(params);
             // output is already a base64 data URL from backend
             ui.updatePreview(output, state.targetImageSrc, state.overlayEnabled);
             state.lastMosaicUrl = output; // Store for download

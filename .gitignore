@@ -40,3 +40,8 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Local planning docs
+docs/
+
+perf.data
