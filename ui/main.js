@@ -9,7 +9,8 @@ function init() {
         tileDir: null,
         lastMosaicUrl: null,
         targetImageSrc: null,
-        overlayEnabled: false
+        overlayEnabled: false,
+        isGenerating: false
     };
 
     async function selectTarget() {
@@ -82,7 +83,7 @@ function init() {
 
     function validateState() {
         const hasBoth = state.targetPath && state.tileDir;
-        ui.setGenerateEnabled(hasBoth);
+        ui.setGenerateEnabled(Boolean(hasBoth) && !state.isGenerating);
         
         // Calculate adaptive settings when both are selected
         if (hasBoth) {
@@ -92,8 +93,14 @@ function init() {
 
     async function generate() {
         if (!state.targetPath || !state.tileDir) return;
+        if (state.isGenerating) {
+            ui.setStatus('Generation already in progress', 'info');
+            return;
+        }
 
+        state.isGenerating = true;
         ui.setLoading(true);
+        ui.setGenerateEnabled(false);
         ui.clearStatus();
 
         const settings = ui.getSettings();
@@ -115,7 +122,9 @@ function init() {
             console.error('Generate error:', err);
             ui.setStatus(typeof err === 'string' ? err : 'Generation failed', 'error');
         } finally {
+            state.isGenerating = false;
             ui.setLoading(false);
+            validateState();
         }
     }
 
