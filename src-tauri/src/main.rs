@@ -3,7 +3,6 @@
 use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
 
@@ -13,7 +12,7 @@ use mosaic_gui::{load_image_with_orientation, MosaicConfig, TileLibrary};
 /// Application state managed by Tauri.
 #[derive(Default)]
 struct AppState {
-    library: Arc<RwLock<Option<TileLibrary>>>,
+    library: RwLock<Option<TileLibrary>>,
 }
 
 /// Parameters for mosaic generation from the frontend.
@@ -118,9 +117,7 @@ async fn generate_mosaic(
         .ok_or_else(|| AppError::Config("Library failed to initialize".into()))?;
 
     let config = MosaicConfig {
-        tile_size: params.tile_size,
         penalty_factor: params.penalty_factor,
-        sigma_divisor: params.sigma_divisor,
     };
 
     lib.generate_mosaic(&params.target_image_path, &config)

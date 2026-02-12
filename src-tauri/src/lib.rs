@@ -96,9 +96,7 @@ impl GaussianMask {
 /// Configuration for mosaic generation.
 #[derive(Debug, Clone, Copy)]
 pub struct MosaicConfig {
-    pub tile_size: u32,
     pub penalty_factor: f64,
-    pub sigma_divisor: f64,
 }
 
 /// Represents a single tile with its metadata.
