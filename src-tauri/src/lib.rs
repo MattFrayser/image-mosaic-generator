@@ -476,4 +476,19 @@ mod tests {
         assert!(validate_mosaic_inputs(8, 0.0, 0.0).is_ok());
         assert!(validate_mosaic_inputs(128, 100.0, 10.0).is_ok());
     }
+
+    #[test]
+    fn validate_mosaic_inputs_rejects_non_finite_values() {
+        let nan_penalty = validate_mosaic_inputs(32, f64::NAN, 4.0);
+        let inf_sigma = validate_mosaic_inputs(32, 50.0, f64::INFINITY);
+
+        assert!(matches!(
+            nan_penalty,
+            Err(AppError::Config(message)) if message.contains("penalty_factor")
+        ));
+        assert!(matches!(
+            inf_sigma,
+            Err(AppError::Config(message)) if message.contains("sigma_divisor")
+        ));
+    }
 }
