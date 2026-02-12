@@ -29,3 +29,24 @@ test('loading with no preview still shows placeholder', () => {
     assert.equal(flags.showPlaceholder, true);
     assert.equal(flags.disableGenerate, true);
 });
+
+test('success event marks preview ready and clears loading lock', () => {
+    const current = { inFlight: true, hasPreview: false };
+    const next = transitionGenerateState(current, 'success');
+    const flags = deriveGenerateUiFlags(next, true);
+
+    assert.equal(next.inFlight, false);
+    assert.equal(next.hasPreview, true);
+    assert.equal(flags.showLoading, false);
+    assert.equal(flags.showPreview, true);
+    assert.equal(flags.disableGenerate, false);
+});
+
+test('cannot-generate input keeps button disabled even when idle', () => {
+    const current = { inFlight: false, hasPreview: true };
+    const flags = deriveGenerateUiFlags(current, false);
+
+    assert.equal(flags.showLoading, false);
+    assert.equal(flags.showPreview, true);
+    assert.equal(flags.disableGenerate, true);
+});
