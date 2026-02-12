@@ -7,7 +7,7 @@ use tauri::State;
 use tokio::sync::RwLock;
 
 use mosaic_gui::errors::AppError;
-use mosaic_gui::{load_image_with_orientation, MosaicConfig, TileLibrary};
+use mosaic_gui::{load_image_with_orientation, validate_mosaic_inputs, MosaicConfig, TileLibrary};
 
 /// Application state managed by Tauri.
 #[derive(Default)]
@@ -92,6 +92,8 @@ async fn generate_mosaic(
     params: MosaicParams,
     state: State<'_, AppState>,
 ) -> Result<String, AppError> {
+    validate_mosaic_inputs(params.tile_size, params.penalty_factor, params.sigma_divisor)?;
+
     let mut library_guard = state.library.write().await;
 
     let needs_reload = match *library_guard {

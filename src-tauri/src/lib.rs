@@ -32,6 +32,35 @@ pub fn load_image_with_orientation(path: impl AsRef<Path>) -> AppResult<DynamicI
     Ok(img)
 }
 
+pub fn validate_mosaic_inputs(
+    tile_size: u32,
+    penalty_factor: f64,
+    sigma_divisor: f64,
+) -> AppResult<()> {
+    if !(8..=128).contains(&tile_size) {
+        return Err(AppError::Config(format!(
+            "Invalid tile_size {}. Expected value in range 8..=128",
+            tile_size
+        )));
+    }
+
+    if !penalty_factor.is_finite() || !(0.0..=100.0).contains(&penalty_factor) {
+        return Err(AppError::Config(format!(
+            "Invalid penalty_factor {}. Expected finite value in range 0..=100",
+            penalty_factor
+        )));
+    }
+
+    if !sigma_divisor.is_finite() || !(0.0..=10.0).contains(&sigma_divisor) {
+        return Err(AppError::Config(format!(
+            "Invalid sigma_divisor {}. Expected finite value in range 0..=10",
+            sigma_divisor
+        )));
+    }
+
+    Ok(())
+}
+
 fn load_resized_image_with_orientation(
     path: impl AsRef<Path>,
     size: u32,
@@ -416,5 +445,35 @@ mod tests {
         assert_eq!(resized.dimensions(), (8, 8));
 
         std::fs::remove_file(test_path).unwrap();
+    }
+
+    #[test]
+    fn validate_mosaic_inputs_rejects_out_of_range_tile_size() {
+        let result = validate_mosaic_inputs(0, 50.0, 4.0);
+        assert!(matches!(
+            result,
+            Err(AppError::Config(message)) if message.contains("tile_size")
+        ));
+    }
+
+    #[test]
+    fn validate_mosaic_inputs_rejects_out_of_range_penalty_and_sigma() {
+        let penalty_result = validate_mosaic_inputs(32, 101.0, 4.0);
+        let sigma_result = validate_mosaic_inputs(32, 50.0, 11.0);
+
+        assert!(matches!(
+            penalty_result,
+            Err(AppError::Config(message)) if message.contains("penalty_factor")
+        ));
+        assert!(matches!(
+            sigma_result,
+            Err(AppError::Config(message)) if message.contains("sigma_divisor")
+        ));
+    }
+
+    #[test]
+    fn validate_mosaic_inputs_accepts_ui_range_values() {
+        assert!(validate_mosaic_inputs(8, 0.0, 0.0).is_ok());
+        assert!(validate_mosaic_inputs(128, 100.0, 10.0).is_ok());
     }
 }
