@@ -1,196 +1,200 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { UIManager } from './ui.js';
 
-// Helper to avoid double conversion
-function toAssetUrl(path) {
-    // Check if already converted
-    if (path.startsWith('http://asset.localhost/') ||
-        path.startsWith('https://asset.localhost/') ||
-        path.startsWith('asset://')) {
-        return path;
-    }
-    return convertFileSrc(path);
-}
-
-function clearStatus() {
-    const existingStatus = document.getElementById('status');
-    if (existingStatus) {
-        existingStatus.remove();
-    }
-}
-
-function showStatus(message, type) {
-    // Only create status for errors
-    if (type !== 'error') return;
-
-    clearStatus();
-
-    const statusEl = document.createElement('div');
-    statusEl.id = 'status';
-    statusEl.className = 'status error';
-    statusEl.textContent = message;
-
-    // Insert after mosaic-info
-    const mosaicInfo = document.getElementById('mosaic-info');
-    mosaicInfo.parentElement.appendChild(statusEl);
-}
-
-let targetImagePath = '';
-let tileDirectoryPath = '';
-
-const elements = {
-    tileSizeSlider: document.getElementById('tile-size'),
-    tileSizeValue: document.getElementById('tile-size-value'),
-    penaltyFactorSlider: document.getElementById('penalty-factor'),
-    penaltyFactorValue: document.getElementById('penalty-factor-value'),
-    sigmaDivisorSlider: document.getElementById('sigma-divisor'),
-    sigmaDivisorValue: document.getElementById('sigma-divisor-value'),
-    selectTargetBtn: document.getElementById('select-target-btn'),
-    selectTilesBtn: document.getElementById('select-tiles-btn'),
-    targetContainer: document.getElementById('target-image-container'),
-    targetPreview: document.getElementById('target-preview'),
-    tilesPath: document.getElementById('tiles-path'),
-    generateBtn: document.getElementById('generate-btn'),
-    mosaicPreview: document.getElementById('mosaic-preview'),
-    loading: document.getElementById('loading'),
-    placeholder: document.getElementById('placeholder'),
-    mosaicInfo: document.getElementById('mosaic-info')
-};
-
-function updateSliderValue(slider, valueDisplay, decimals = 0) {
-    const value = parseFloat(slider.value);
-    valueDisplay.textContent = decimals > 0 ? value.toFixed(1) : value;
-    checkCanGenerate();
-}
-
-elements.tileSizeSlider.addEventListener('input', (e) => {
-    updateSliderValue(e.target, elements.tileSizeValue);
-});
-
-elements.penaltyFactorSlider.addEventListener('input', (e) => {
-    updateSliderValue(e.target, elements.penaltyFactorValue, 0);
-});
-
-elements.sigmaDivisorSlider.addEventListener('input', (e) => {
-    updateSliderValue(e.target, elements.sigmaDivisorValue, 1);
-});
-
-async function selectTargetImage() {
-    try {
-        const selected = await open({
-            multiple: false,
-            filters: [{
-                name: 'Image',
-                extensions: ['png', 'jpg', 'jpeg']
-            }]
-        });
-
-        if (selected) {
-            targetImagePath = selected;
-            elements.targetPreview.src = toAssetUrl(selected);
-            elements.targetContainer.classList.add('has-image');
-            checkCanGenerate();
-            clearStatus();
-        }
-    } catch (error) {
-        showStatus('Error selecting file: ' + error, 'error');
-    }
-}
-
-// Attach to button click
-elements.selectTargetBtn.addEventListener('click', selectTargetImage);
-
-// Attach to preview click (for changing image)
-elements.targetPreview.addEventListener('click', selectTargetImage);
-
-elements.selectTilesBtn.addEventListener('click', async () => {
-    try {
-        const selected = await open({
-            directory: true,
-            multiple: false
-        });
-
-        if (selected) {
-            tileDirectoryPath = selected;
-            elements.tilesPath.textContent = selected.split('/').pop();
-            checkCanGenerate();
-            clearStatus();
-        }
-    } catch (error) {
-        showStatus('Error selecting folder: ' + error, 'error');
-    }
-});
-
-elements.generateBtn.addEventListener('click', () => {
-    generateMosaic();
-});
-
-function checkCanGenerate() {
-    const canGenerate = targetImagePath && tileDirectoryPath;
-    elements.generateBtn.disabled = !canGenerate;
-}
-
-
-async function generateMosaic() {
-    if (!targetImagePath || !tileDirectoryPath) {
-        showStatus('Please select both target image and tile directory', 'error');
-        return;
-    }
-
-    elements.loading.classList.remove('hidden');
-    elements.mosaicPreview.classList.add('hidden');
-    elements.placeholder.classList.add('hidden');
-    clearStatus();
-
-    const params = {
-        target_image_path: targetImagePath,
-        tile_directory: tileDirectoryPath,
-        tile_size: parseInt(elements.tileSizeSlider.value),
-        penalty_factor: parseFloat(elements.penaltyFactorSlider.value),
-        sigma_divisor: parseFloat(elements.sigmaDivisorSlider.value)
+function init() {
+    const ui = new UIManager();
+    const state = {
+        targetPath: null,
+        tileDir: null,
+        lastMosaicUrl: null,
+        targetImageSrc: null,
+        overlayEnabled: false
     };
 
-    try {
-        console.log('Generating mosaic with params:', params);
-        const filePath = await invoke('generate_mosaic', { params });
-        console.log('Mosaic generated at:', filePath);
+    async function selectTarget() {
+        try {
+            const selected = await open({
+                multiple: false,
+                filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg'] }]
+            });
 
-        const assetUrl = toAssetUrl(filePath);
-        console.log('Asset URL:', assetUrl);
-
-        // Force image reload with cache busting
-        const cacheBustedUrl = `${assetUrl}?t=${Date.now()}`;
-        elements.mosaicPreview.src = cacheBustedUrl;
-
-        elements.mosaicPreview.classList.remove('hidden');
-        elements.placeholder.classList.add('hidden');
-
-        // Calculate and display mosaic info
-        const img = new Image();
-        img.onload = () => {
-            const tilesWide = Math.ceil(img.width / parseInt(elements.tileSizeSlider.value));
-            const tilesHigh = Math.ceil(img.height / parseInt(elements.tileSizeSlider.value));
-            const totalTiles = tilesWide * tilesHigh;
-
-            elements.mosaicInfo.textContent = `Mosaic: ${img.width}×${img.height}px | ${tilesWide}×${tilesHigh} tiles (${totalTiles} total)`;
-            elements.mosaicInfo.classList.remove('hidden');
-        };
-        img.src = cacheBustedUrl;
-
-        clearStatus();
-    } catch (error) {
-        elements.placeholder.classList.remove('hidden');
-        showStatus('Error: ' + error, 'error');
-        console.error('Generation error:', error);
-    } finally {
-        elements.loading.classList.add('hidden');
+            if (selected) {
+                state.targetPath = selected;
+                const preview = document.getElementById('target-preview');
+                const container = document.getElementById('target-image-container');
+                if (preview) {
+                    const targetSrc = convertFileSrc(selected);
+                    preview.src = targetSrc;
+                    preview.classList.remove('hidden');
+                    state.targetImageSrc = targetSrc;
+                }
+                if (container) container.classList.add('has-image');
+                validateState();
+            }
+        } catch (err) {
+            console.error('Select target error:', err);
+            ui.setStatus(`Selection failed: ${err}`, 'error');
+        }
     }
+
+    async function selectTileFolder() {
+        try {
+            const selected = await open({ directory: true });
+            if (selected) {
+                state.tileDir = selected;
+                const pathEl = document.getElementById('tiles-path');
+                const btn = document.getElementById('select-tiles-btn');
+                const container = document.getElementById('tile-directory-container');
+                if (pathEl) {
+                    pathEl.textContent = selected.split(/[/\\]/).pop();
+                    pathEl.classList.add('selected');
+                }
+                if (btn) {
+                    btn.textContent = 'Change Folder';
+                }
+                if (container) {
+                    container.classList.add('has-selection');
+                }
+                validateState();
+            }
+        } catch (err) {
+            console.error('Select folder error:', err);
+            ui.setStatus(`Folder failed: ${err}`, 'error');
+        }
+    }
+
+    async function calculateAdaptiveSettings() {
+        if (!state.targetPath || !state.tileDir) return;
+        
+        try {
+            const adaptive = await invoke('get_adaptive_settings', {
+                target_image_path: state.targetPath,
+                tile_directory: state.tileDir
+            });
+            
+            // Update UI with adaptive suggestions
+            ui.showAdaptiveSettings(adaptive);
+        } catch (err) {
+            console.error('Failed to calculate adaptive settings:', err);
+        }
+    }
+
+    function validateState() {
+        const hasBoth = state.targetPath && state.tileDir;
+        ui.setGenerateEnabled(hasBoth);
+        
+        // Calculate adaptive settings when both are selected
+        if (hasBoth) {
+            calculateAdaptiveSettings();
+        }
+    }
+
+    async function generate() {
+        if (!state.targetPath || !state.tileDir) return;
+
+        ui.setLoading(true);
+        ui.clearStatus();
+
+        const settings = ui.getSettings();
+        const params = {
+            target_image_path: state.targetPath,
+            tile_directory: state.tileDir,
+            tile_size: settings.tile_size,
+            penalty_factor: settings.penalty_factor,
+            sigma_divisor: settings.sigma_divisor
+        };
+
+        try {
+            const output = await invoke('generate_mosaic', { params });
+            // output is already a base64 data URL from backend
+            ui.updatePreview(output, state.targetImageSrc, state.overlayEnabled);
+            state.lastMosaicUrl = output; // Store for download
+            ui.setStatus('Mosaic generated!', 'success');
+        } catch (err) {
+            console.error('Generate error:', err);
+            ui.setStatus(typeof err === 'string' ? err : 'Generation failed', 'error');
+        } finally {
+            ui.setLoading(false);
+        }
+    }
+
+    // Bind events
+    document.getElementById('select-target-btn')?.addEventListener('click', selectTarget);
+    document.getElementById('select-tiles-btn')?.addEventListener('click', selectTileFolder);
+    document.getElementById('generate-btn')?.addEventListener('click', generate);
+
+    // Make target preview clickable to change image
+    const targetPreview = document.getElementById('target-preview');
+    if (targetPreview) {
+        targetPreview.addEventListener('click', selectTarget);
+        targetPreview.style.cursor = 'pointer';
+    }
+
+    // Overlay toggle handler
+    const overlayToggle = document.getElementById('overlay-toggle');
+    const opacityControl = document.getElementById('opacity-control');
+    if (overlayToggle) {
+        overlayToggle.addEventListener('change', (e) => {
+            state.overlayEnabled = e.target.checked;
+
+            // Show/hide opacity slider
+            if (opacityControl) {
+                opacityControl.style.display = state.overlayEnabled ? 'block' : 'none';
+            }
+
+            // Update preview if mosaic exists
+            if (state.lastMosaicUrl) {
+                ui.updatePreview(state.lastMosaicUrl, state.targetImageSrc, state.overlayEnabled);
+            }
+        });
+    }
+
+    // Opacity slider handler
+    const opacitySlider = document.getElementById('opacity-slider');
+    if (opacitySlider) {
+        opacitySlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            ui.setOpacity(value);
+            const valueDisplay = document.getElementById('opacity-value');
+            if (valueDisplay) {
+                valueDisplay.textContent = Math.round(value);
+            }
+        });
+    }
+
+    // Download button handler
+    function downloadMosaic() {
+        if (!state.lastMosaicUrl) return;
+        
+        // Convert base64 data URL to blob
+        const base64Data = state.lastMosaicUrl.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/png' });
+        
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'mosaic.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        ui.setStatus('Mosaic downloaded!', 'success');
+    }
+
+    document.getElementById('download-btn')?.addEventListener('click', downloadMosaic);
 }
 
-function showStatus(message, type) {
-    elements.status.textContent = message;
-    elements.status.className = `status ${type}`;
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
 }
-
-checkCanGenerate();

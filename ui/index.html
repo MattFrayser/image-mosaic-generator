@@ -11,56 +11,80 @@
         <div class="main-content">
             <div class="controls-panel">
                 <div class="control-group">
-                    <label for="target-image">Target Image</label>
+                    <label>Target Image</label>
                     <div id="target-image-container">
-                        <img id="target-preview" class="target-preview hidden" alt="Target Image">
+                        <img id="target-preview" class="target-preview hidden" alt="Target">
                         <button id="select-target-btn" class="file-btn">Select Image</button>
                     </div>
                 </div>
 
                 <div class="control-group">
-                    <label for="tile-directory">Tile Directory</label>
-                    <button id="select-tiles-btn" class="file-btn">Select Folder</button>
-                    <span id="tiles-path" class="file-path">No folder selected</span>
+                    <label>Tile Directory</label>
+                    <div id="tile-directory-container">
+                        <button id="select-tiles-btn" class="file-btn">Select Folder</button>
+                        <span id="tiles-path" class="file-path">No folder selected</span>
+                    </div>
                 </div>
 
                 <div class="control-group">
-                    <label for="tile-size">
+                    <label>
                         Tile Size: <span id="tile-size-value">32</span>px
                     </label>
                     <input type="range" id="tile-size" min="8" max="128" value="32" step="4">
-                    <span class="hint">Smaller = more tiles, finer detail. Larger = fewer tiles, blockier effect.</span>
+                    <span class="hint">Smaller = more detail, Larger = blockier</span>
                 </div>
 
                 <div class="control-group">
-                    <label for="penalty-factor">
+                    <label>
                         Penalty Factor: <span id="penalty-factor-value">50</span>
                     </label>
                     <input type="range" id="penalty-factor" min="0" max="100" value="50" step="1">
-                    <span class="hint">Controls tile reuse penalty (0=ignore, 50=balanced, 100=max diversity)</span>
+                    <span class="hint">0=reuse tiles, 100=max diversity</span>
                 </div>
 
                 <div class="control-group">
-                    <label for="sigma-divisor">
+                    <label>
                         Sigma Divisor: <span id="sigma-divisor-value">4.0</span>
                     </label>
                     <input type="range" id="sigma-divisor" min="0" max="10" value="4" step="0.5">
-                    <span class="hint">0=uniform, higher=stronger center focus</span>
+                    <span class="hint">0=uniform, higher=center focus</span>
+                </div>
+
+                <div class="control-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="overlay-toggle">
+                        <span>Overlay Mode</span>
+                    </label>
+                    <span class="hint">Compare mosaic with original</span>
+                </div>
+
+                <div class="control-group" id="opacity-control" style="display: none;">
+                    <label>
+                        Opacity: <span id="opacity-value">50</span>%
+                    </label>
+                    <input type="range" id="opacity-slider" min="0" max="100" value="50" step="1">
+                    <span class="hint">0=original only, 100=mosaic only</span>
                 </div>
 
                 <button id="generate-btn" class="generate-btn" disabled>Generate Mosaic</button>
-
-                <div id="mosaic-info" class="mosaic-info hidden"></div>
+                <div id="adaptive-info"></div>
+                <div id="status-container"></div>
             </div>
 
             <div class="preview-panel">
                 <div id="loading" class="loading hidden">
                     <div class="spinner"></div>
-                    <p>Generating mosaic...</p>
+                    <p>Generating...</p>
                 </div>
-                <img id="mosaic-preview" class="mosaic-image hidden" alt="Mosaic Preview">
+                <div id="mosaic-container" class="mosaic-container hidden">
+                    <div class="overlay-wrapper">
+                        <img id="target-overlay" class="overlay-image" alt="Original" src="">
+                        <img id="mosaic-overlay" class="overlay-image" alt="Mosaic" src="">
+                    </div>
+                    <button id="download-btn" class="download-btn">Download Mosaic</button>
+                </div>
                 <div id="placeholder" class="placeholder">
-                    Select images and adjust settings to generate a mosaic
+                    Select images and generate a mosaic
                 </div>
             </div>
         </div>
