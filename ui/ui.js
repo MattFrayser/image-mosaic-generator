@@ -50,12 +50,24 @@ export class UIManager {
     setLoading(isLoading) {
         if (isLoading) {
             this.els.loading?.classList.remove('hidden');
-            const container = document.getElementById('mosaic-container');
-            if (container) container.classList.add('hidden');
-            this.els.placeholder?.classList.add('hidden');
         } else {
             this.els.loading?.classList.add('hidden');
         }
+    }
+
+    applyGenerateUiFlags(flags) {
+        this.setLoading(flags.showLoading);
+
+        const container = document.getElementById('mosaic-container');
+        if (container) {
+            container.classList.toggle('hidden', !flags.showPreview);
+        }
+
+        if (this.els.placeholder) {
+            this.els.placeholder.classList.toggle('hidden', !flags.showPlaceholder);
+        }
+
+        this.setGenerateEnabled(!flags.disableGenerate);
     }
 
     updatePreview(mosaicUrl, targetUrl, overlayEnabled) {

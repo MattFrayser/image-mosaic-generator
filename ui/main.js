@@ -1,6 +1,7 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { UIManager } from './ui.js';
+import { deriveGenerateUiFlags, transitionGenerateState } from './generate-state.mjs';
 
 function init() {
     const ui = new UIManager();
@@ -10,8 +11,28 @@ function init() {
         lastMosaicUrl: null,
         targetImageSrc: null,
         overlayEnabled: false,
-        isGenerating: false
+        generateState: {
+            inFlight: false,
+            hasPreview: false
+        }
     };
+
+    function canGenerate() {
+        return Boolean(state.targetPath && state.tileDir);
+    }
+
+    function applyGenerateUiState() {
+        const flags = deriveGenerateUiFlags(state.generateState, canGenerate());
+        ui.applyGenerateUiFlags(flags);
+    }
+
+    function transitionAndApply(event) {
+        const next = transitionGenerateState(state.generateState, event);
+        const changed = next !== state.generateState;
+        state.generateState = next;
+        applyGenerateUiState();
+        return changed;
+    }
 
     async function selectTarget() {
         try {
@@ -82,8 +103,8 @@ function init() {
     }
 
     function validateState() {
-        const hasBoth = state.targetPath && state.tileDir;
-        ui.setGenerateEnabled(Boolean(hasBoth) && !state.isGenerating);
+        const hasBoth = canGenerate();
+        applyGenerateUiState();
         
         // Calculate adaptive settings when both are selected
         if (hasBoth) {
@@ -92,15 +113,13 @@ function init() {
     }
 
     async function generate() {
-        if (!state.targetPath || !state.tileDir) return;
-        if (state.isGenerating) {
+        if (!canGenerate()) return;
+        const started = transitionAndApply('start');
+        if (!started) {
             ui.setStatus('Generation already in progress', 'info');
             return;
         }
 
-        state.isGenerating = true;
-        ui.setLoading(true);
-        ui.setGenerateEnabled(false);
         ui.clearStatus();
 
         const settings = ui.getSettings();
@@ -117,14 +136,12 @@ function init() {
             // output is already a base64 data URL from backend
             ui.updatePreview(output, state.targetImageSrc, state.overlayEnabled);
             state.lastMosaicUrl = output; // Store for download
+            transitionAndApply('success');
             ui.setStatus('Mosaic generated!', 'success');
         } catch (err) {
             console.error('Generate error:', err);
+            transitionAndApply('error');
             ui.setStatus(typeof err === 'string' ? err : 'Generation failed', 'error');
-        } finally {
-            state.isGenerating = false;
-            ui.setLoading(false);
-            validateState();
         }
     }
 
@@ -200,6 +217,8 @@ function init() {
     }
 
     document.getElementById('download-btn')?.addEventListener('click', downloadMosaic);
+
+    validateState();
 }
 
 if (document.readyState === 'loading') {
