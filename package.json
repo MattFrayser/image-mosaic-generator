@@ -4,8 +4,8 @@
   "description": "Mosaic Generator GUI",
   "scripts": {
     "tauri": "tauri",
-    "dev": "tauri dev",
-    "build": "tauri build",
+    "dev": "GSK_RENDERER=ngl WEBKIT_DISABLE_DMABUF_RENDERER=1 tauri dev",
+    "build": "NO_STRIP=true GSK_RENDERER=ngl WEBKIT_DISABLE_DMABUF_RENDERER=1 tauri build",
     "vite": "vite",
     "vite:build": "vite build"
   },
