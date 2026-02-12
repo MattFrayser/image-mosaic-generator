@@ -32,6 +32,14 @@ pub fn load_image_with_orientation(path: impl AsRef<Path>) -> AppResult<DynamicI
     Ok(img)
 }
 
+fn load_resized_image_with_orientation(
+    path: impl AsRef<Path>,
+    size: u32,
+) -> AppResult<DynamicImage> {
+    let img = load_image_with_orientation(path)?;
+    Ok(img.resize_to_fill(size, size, FilterType::Lanczos3))
+}
+
 // Constants for performance tuning
 const PENALTY_MULTIPLIER: f64 = 50.0;
 const KD_TREE_K_MIN: usize = 10;
@@ -129,14 +137,14 @@ impl Tile {
             return Ok(Arc::clone(cached));
         }
 
-        let img = image::open(&self.path).map_err(|e| {
-            AppError::Image(format!(
-                "Failed to load tile {}: {}",
-                self.path.display(),
-                e
-            ))
-        })?;
-        let resized = img.resize_to_fill(self.tile_size, self.tile_size, FilterType::Lanczos3);
+        let resized =
+            load_resized_image_with_orientation(&self.path, self.tile_size).map_err(|e| {
+                AppError::Image(format!(
+                    "Failed to load tile {}: {}",
+                    self.path.display(),
+                    e
+                ))
+            })?;
         let cached = Arc::new(resized);
         self.image_cache = Some(Arc::clone(&cached));
         Ok(cached)
@@ -219,9 +227,8 @@ impl TileLibrary {
                     return None;
                 }
 
-                let img = image::open(&path).ok()?;
+                let tile_img = load_resized_image_with_orientation(&path, size).ok()?;
                 // Calculate color from resized image
-                let tile_img = img.resize_to_fill(size, size, FilterType::Lanczos3);
                 let color = avg_rgb_with_mask(&tile_img, mask);
 
                 Some(Tile::new(path, color, size))
@@ -365,6 +372,8 @@ impl TileLibrary {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{ImageBuffer, Rgba};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn build_test_library() -> TileLibrary {
         let points = [[0.0, 0.0, 0.0]];
@@ -388,5 +397,24 @@ mod tests {
 
         assert!(lib.matches_config(Path::new("/tmp/tiles"), 32, 4.0));
         assert!(!lib.matches_config(Path::new("/tmp/tiles"), 32, 8.0));
+    }
+
+    #[test]
+    fn load_resized_image_with_orientation_resizes_to_tile_size() {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let test_path = std::env::temp_dir().join(format!("mosaic-test-{}.png", timestamp));
+
+        let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
+            ImageBuffer::from_fn(20, 10, |_x, _y| Rgba([255, 0, 0, 255]));
+        img.save(&test_path).unwrap();
+
+        let resized = load_resized_image_with_orientation(&test_path, 8).unwrap();
+
+        assert_eq!(resized.dimensions(), (8, 8));
+
+        std::fs::remove_file(test_path).unwrap();
     }
 }
